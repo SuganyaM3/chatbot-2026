@@ -3,10 +3,8 @@ import streamlit as st
 from huggingface_hub import InferenceClient
 
 # =========================================================
-# CONFIGURATION
+# PAGE CONFIG
 # =========================================================
-
-DEFAULT_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct"
 
 st.set_page_config(
     page_title="Hugging Face Chatbot",
@@ -15,38 +13,52 @@ st.set_page_config(
 )
 
 # =========================================================
+# DEFAULT MODEL
+# =========================================================
+
+DEFAULT_MODEL = "microsoft/Phi-3-mini-4k-instruct"
+
+# =========================================================
 # LOAD HUGGING FACE TOKEN
 # =========================================================
 
+HF_TOKEN = None
+
+# Try Streamlit secrets first
 try:
     HF_TOKEN = st.secrets["HF_TOKEN"]
 except Exception:
+    pass
+
+# Fallback to environment variable
+if not HF_TOKEN:
     HF_TOKEN = os.getenv("HF_TOKEN")
 
+# Stop app if token missing
 if not HF_TOKEN:
-    st.error("Hugging Face token not found.")
+    st.error("❌ Hugging Face token not found.")
+    st.info("Add HF_TOKEN inside Streamlit secrets.")
     st.stop()
 
 # =========================================================
-# SIDEBAR SETTINGS
+# SIDEBAR
 # =========================================================
 
 with st.sidebar:
 
-    st.header("⚙️ Model Settings")
+    st.title("⚙️ Settings")
 
     model_id = st.text_input(
         "Model ID",
-        value=DEFAULT_MODEL,
-        help="Enter any Hugging Face Instruct/Text Generation model"
+        value=DEFAULT_MODEL
     )
 
-    max_new_tokens = st.slider(
-        "Max New Tokens",
-        min_value=32,
-        max_value=512,
-        value=160,
-        step=16
+    max_tokens = st.slider(
+        "Max Tokens",
+        min_value=64,
+        max_value=1024,
+        value=256,
+        step=32
     )
 
     temperature = st.slider(
@@ -62,11 +74,10 @@ with st.sidebar:
         st.rerun()
 
 # =========================================================
-# INITIALIZE INFERENCE CLIENT
+# INITIALIZE CLIENT
 # =========================================================
 
 client = InferenceClient(
-    model=model_id,
     token=HF_TOKEN
 )
 
@@ -78,16 +89,12 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # =========================================================
-# PAGE TITLE
+# TITLE
 # =========================================================
 
-st.title("🤖 Hugging Face Chatbot")
+st.title("🤖 Hugging Face AI Chatbot")
 
-st.markdown(
-    """
-    Chat with Hugging Face open-source language models using Streamlit.
-    """
-)
+st.caption("Built with Streamlit + Hugging Face Inference API")
 
 # =========================================================
 # DISPLAY CHAT HISTORY
@@ -99,75 +106,52 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # =========================================================
-# BUILD PROMPT
+# USER INPUT
 # =========================================================
 
-def build_prompt(messages):
-
-    prompt = ""
-
-    for message in messages:
-
-        if message["role"] == "user":
-            prompt += f"User: {message['content']}\n"
-
-        elif message["role"] == "assistant":
-            prompt += f"Assistant: {message['content']}\n"
-
-    prompt += "Assistant:"
-
-    return prompt
+user_prompt = st.chat_input("Type your message...")
 
 # =========================================================
 # GENERATE RESPONSE
 # =========================================================
 
-def generate_response(messages):
-
-    prompt = build_prompt(messages)
-
-    response = client.text_generation(
-        prompt=prompt,
-        max_new_tokens=max_new_tokens,
-        temperature=temperature,
-    )
-
-    return response.strip()
-
-# =========================================================
-# USER INPUT
-# =========================================================
-
-user_input = st.chat_input("Type your message...")
-
-if user_input:
+if user_prompt:
 
     # Store user message
     st.session_state.messages.append(
         {
             "role": "user",
-            "content": user_input
+            "content": user_prompt
         }
     )
 
     # Display user message
     with st.chat_message("user"):
-        st.markdown(user_input)
+        st.markdown(user_prompt)
 
-    # Generate assistant response
+    # Assistant response
     with st.chat_message("assistant"):
 
         with st.spinner("Thinking..."):
 
             try:
 
-                assistant_response = generate_response(
-                    st.session_state.messages
+                completion = client.chat_completion(
+                    model=model_id,
+                    messages=st.session_state.messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+
+                assistant_response = (
+                    completion.choices[0]
+                    .message
+                    .content
                 )
 
             except Exception as e:
 
-                assistant_response = f"❌ Error: {str(e)}"
+                assistant_response = f"❌ Error:\n\n{str(e)}"
 
         st.markdown(assistant_response)
 
