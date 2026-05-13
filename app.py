@@ -2,7 +2,7 @@ import os
 
 import streamlit as st
 
-
+HF_TOKEN = os.getenv("HF_TOKEN")
 DEFAULT_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct"
 
 
