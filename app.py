@@ -8,6 +8,13 @@ DEFAULT_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct"
 
 st.set_page_config(page_title="Hugging Face Chatbot")
 
+HF_TOKEN = st.secrets["HF_TOKEN"]
+
+# Initialize client
+client = InferenceClient(
+    model=DEFAULT_MODEL,
+    token=HF_TOKEN
+)
 
 @st.cache_resource(show_spinner="Loading Hugging Face model...")
 def get_llm(model_id):
